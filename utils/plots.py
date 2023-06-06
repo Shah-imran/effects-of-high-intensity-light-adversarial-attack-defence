@@ -229,7 +229,7 @@ def output_to_target(output, max_det=300):
 def plot_images(images, targets, paths=None, fname='images.jpg', names=None):
     # Plot image grid with labels
     if isinstance(images, torch.Tensor):
-        images = images.cpu().float().numpy()
+        images = images.detach().cpu().float().numpy()
     if isinstance(targets, torch.Tensor):
         targets = targets.cpu().numpy()
 

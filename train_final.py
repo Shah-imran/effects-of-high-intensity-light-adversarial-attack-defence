@@ -57,6 +57,9 @@ from torch.optim import lr_scheduler
 from torchvision.transforms.functional import to_pil_image
 from tqdm import tqdm
 
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+torch.cuda.empty_cache()
+
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
@@ -69,6 +72,16 @@ RANK = int(os.getenv('RANK', -1))
 WORLD_SIZE = int(os.getenv('WORLD_SIZE', 1))
 GIT_INFO = check_git_info()
 
+def process_images(grad, image_list, detections):
+    for i, img in enumerate(image_list):
+        img_grad = grad[i].detach().cpu().numpy()  # convert tensor to numpy array
+        img_detections = detections.get(i, [])
+        process_single_image(img_grad, img, img_detections)
+
+def process_single_image(img_grad, img, img_detections):
+    # Here you can add the processing code for a single image.
+    # This is just a placeholder function for you to complete.
+    pass
 
 def tensor_to_image(tensor):
     # Clone the tensor, detach it from the computation graph, move it to the CPU and convert to numpy array
@@ -336,12 +349,11 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 pred = model(imgs)  # forward
                 loss, loss_items = compute_loss(pred, targets.to(device))  # loss scaled by batch_size
 
-                grad = torch.autograd.grad(loss, [imgs], create_graph=True,
-                                           retain_graph=True, allow_unused=True)[0]
-
+                grad = torch.autograd.grad(loss, [imgs], retain_graph=True, allow_unused=True)[0]
+                
                 image_list = [to_pil_image(img) for img in imgs]
 
-                pprint(detect_mod.run_detection(detection_model, image_list, mode='images', **detection_config))
+                detections = detect_mod.run_detection(detection_model, image_list, mode='images', **detection_config)
 
                 if RANK != -1:
                     loss *= WORLD_SIZE  # gradient averaged between devices in DDP mode
