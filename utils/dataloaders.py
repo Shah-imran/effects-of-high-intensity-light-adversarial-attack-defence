@@ -236,6 +236,42 @@ class LoadScreenshots:
         return str(self.screen), im, im0, None, s  # screen, img, original img, im0s, s
 
 
+class LoadImagesPIL:
+    # Custom YOLOv5 dataloader for PIL Images
+    def __init__(self, img_list, img_size=640, stride=32, auto=True, transforms=None):
+        self.img_list = img_list  # list of PIL Images
+        self.img_size = img_size
+        self.stride = stride
+        self.auto = auto
+        self.transforms = transforms  # optional
+        self.mode = 'image'
+
+    def __iter__(self):
+        self.count = 0
+        return self
+
+    def __next__(self):
+        if self.count == len(self.img_list):
+            raise StopIteration
+        img0 = self.img_list[self.count]
+
+        # Convert PIL image to numpy array
+        img0 = np.array(img0)
+
+        # Padded resize
+        img = letterbox(img0, self.img_size, stride=self.stride)[0]
+
+        # Convert
+        img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, RGB to BGR
+        img = np.ascontiguousarray(img)
+
+        self.count += 1
+        return str(self.count), img, img0, None
+
+    def __len__(self):
+        return len(self.img_list)  # number of images
+
+
 class LoadImages:
     # YOLOv5 image/video dataloader, i.e. `python detect.py --source image.jpg/vid.mp4`
     def __init__(self, path, img_size=640, stride=32, auto=True, transforms=None, vid_stride=1):
