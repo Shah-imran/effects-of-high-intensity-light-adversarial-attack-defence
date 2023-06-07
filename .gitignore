@@ -260,6 +260,6 @@ fabric.properties
 .history/
 .zip
 .txt
-yolo5
-.vscode
-dataset
+yolo5/
+.vscode/
+dataset/
