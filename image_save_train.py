@@ -32,6 +32,7 @@ from utils.dataloaders import create_dataloader
 from utils.callbacks import Callbacks
 from utils.autobatch import check_train_batch_size
 from utils.autoanchor import check_anchors
+from utils.plots import Annotator, colors, save_one_box
 from models.yolo import Model
 from models.experimental import attempt_load
 import detect_mod
@@ -57,7 +58,8 @@ from torch.optim import lr_scheduler
 from torchvision.transforms.functional import to_pil_image
 from torchvision.transforms import ToTensor
 from tqdm import tqdm
-from PIL import Image, ImageDraw
+from PIL import Image
+from PIL import ImageDraw
 
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 torch.cuda.empty_cache()
@@ -76,70 +78,97 @@ WORLD_SIZE = int(os.getenv('WORLD_SIZE', 1))
 GIT_INFO = check_git_info()
 
 
-def process_images(grad, image_list, detections):
+def process_images(grad, image_list, detections, epoch):
     mod_image_list = []
     for i, img in enumerate(image_list):
         img_grad = grad[i].detach().cpu().numpy()  # convert tensor to numpy array
         img_detections = detections.get(str(i), [])
-        mod_image_list.append(process_single_image(img_grad, img, img_detections))
+        process_single_image(img_grad, img, img_detections, i, epoch)
 
-    return mod_image_list
 
 light_noise = Image.open('light-noise-alpha.png')
 
-def process_single_image(img_grad, img, img_detections, kernel_size_ratio=0.1, noise_size_ratio=1):
+def process_single_image(img_grad, img, img_detections, index, epoch, kernel_size_ratio=0.1, noise_size_ratio=1):
+    start_ratio = 0.5
+    end_ratio = 2
+    step = 0.05
 
-    # remove the negative gradient values and normalize the positive part
-    img_grad = np.maximum(0, img_grad)  # positive part, 0 to max
-    img_grad /= np.max(img_grad) if np.max(img_grad) != 0 else 1  # normalize positive values between 0 and 1
+    img_grad = np.maximum(0, img_grad)  
+    img_grad /= np.max(img_grad) if np.max(img_grad) != 0 else 1  
     
     # check if detections have len more than zero
     if len(img_detections) > 0:
-        # start looping over detections
-        for detection in img_detections:
-            # get the coordinates
-            x1, y1, x2, y2 = detection[1], detection[2], detection[3], detection[4]
+        for ratio in np.arange(start_ratio, end_ratio, step):
+            noise_size_ratio = round(ratio, 2)  
+            copy_img_cal = img.copy()
+            copy_img_random = img.copy()  
+            # start looping over detections
+            for detection in img_detections:
+                # get the coordinates
+                x1, y1, x2, y2 = detection[1], detection[2], detection[3], detection[4]
 
-            # ensure coords are integer
-            x1, y1, x2, y2 = map(int, [x1, y1, x2, y2])
+                # draw = ImageDraw.Draw(img)
+                # draw.rectangle([x1, y1, x2, y2], outline="yellow", width=2)
 
-            # Ensure that we don't go out of bounds (optional)
-            x1 = max(0, x1)
-            y1 = max(0, y1)
-            x2 = min(img_grad.shape[1] - 1, x2)
-            y2 = min(img_grad.shape[2] - 1, y2)
+                # ensure coords are integer
+                x1, y1, x2, y2 = map(int, [x1, y1, x2, y2])
 
-            # Determine the kernel size based on the ratio and detection box
-            kernel_size = int(min((x2 - x1), (y2 - y1)) * kernel_size_ratio)
-            stride = kernel_size // 2  # stride is half of kernel size
+                # Ensure that we don't go out of bounds (optional)
+                x1 = max(0, x1)
+                y1 = max(0, y1)
+                x2 = min(img_grad.shape[1] - 1, x2)
+                y2 = min(img_grad.shape[2] - 1, y2)
 
-            if not stride < 1 and kernel_size >= 3:
-                max_sum_kernel = 0
-                max_sum_kernels = []
+                # Determine the kernel size based on the ratio and detection box
+                kernel_size = int(min((x2 - x1), (y2 - y1)) * kernel_size_ratio)
+                stride = kernel_size // 2  # stride is half of kernel size
 
-                # loop over grad array
-                for i in range(x1, x2 - kernel_size + 1, stride):  
-                    for j in range(y1, y2 - kernel_size + 1, stride):
-                        sum_kernel = np.sum(img_grad[:, i:i+kernel_size, j:j+kernel_size])
-                        if sum_kernel > max_sum_kernel:
-                            max_sum_kernel = sum_kernel
-                            max_sum_kernels = [(i + kernel_size // 2, j + kernel_size // 2, sum_kernel)]
-                        elif sum_kernel == max_sum_kernel:
-                            max_sum_kernels.append((i + kernel_size // 2, j + kernel_size // 2, sum_kernel))
+                if not stride < 1 and kernel_size >= 3:
+                    max_sum_kernel = 0
+                    max_sum_kernels = []
 
-                chosen_kernel = random.choice(max_sum_kernels)
+                    # loop over grad array
+                    for i in range(x1, x2 - kernel_size + 1, stride):  
+                        for j in range(y1, y2 - kernel_size + 1, stride):
+                            sum_kernel = np.sum(img_grad[:, i:i+kernel_size, j:j+kernel_size])
+                            if sum_kernel > max_sum_kernel:
+                                max_sum_kernel = sum_kernel
+                                max_sum_kernels = [(i + kernel_size // 2, j + kernel_size // 2, sum_kernel)]
+                            elif sum_kernel == max_sum_kernel:
+                                max_sum_kernels.append((i + kernel_size // 2, j + kernel_size // 2, sum_kernel))
 
-                # print(f'Chosen max sum kernel for detection {detection[0]}: {max_sum_kernels}')
+                    chosen_kernel = random.choice(max_sum_kernels)
 
-                new_size = (int((x2 - x1) * noise_size_ratio), int((y2 - y1) * noise_size_ratio))
-                resized_noise = light_noise.resize(new_size)
+                    # print(f'Chosen max sum kernel for detection {detection[0]}: {max_sum_kernels}')
+                    
+                    new_size = (int((x2 - x1) * noise_size_ratio), int((y2 - y1) * noise_size_ratio))
+                    resized_noise = light_noise.resize(new_size)
+                    
+                    copy_img_cal.paste(resized_noise, (chosen_kernel[0] - resized_noise.size[0] // 2, chosen_kernel[1] - resized_noise.size[1] // 2), resized_noise)
+                    
+                    random_x = random.randint(x1, x2)
+                    random_y = random.randint(y1, y2)
+                    
+                    copy_img_random.paste(resized_noise, (random_x - resized_noise.size[0] // 2, random_y - resized_noise.size[1] // 2), resized_noise)
 
-                img.paste(resized_noise, (chosen_kernel[0] - resized_noise.size[0] // 2, chosen_kernel[1] - resized_noise.size[1] // 2), resized_noise)
+            mod_path = os.path.join(exp_path, 'mod', str(noise_size_ratio))
+            random_path = os.path.join(exp_path, 'random', str(noise_size_ratio))
+            
+            try:
+                os.makedirs(mod_path)
+                os.makedirs(random_path)
+            except:
+                pass
 
-        return img
-    else:
-        return img
-    
+            path = os.path.join(mod_path, f"mod_{epoch}_{index}.png")
+            copy_img_cal.save(path)
+
+            path = os.path.join(random_path, f"random_{epoch}_{index}.png")
+            copy_img_random.save(path)
+
+        
+exp_path = os.path.join(os.getcwd(), 'runs', 'experiment')
+epoch_dict = {}
 
 def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictionary
     save_dir, epochs, batch_size, weights, single_cls, evolve, data, cfg, resume, noval, nosave, workers, freeze = \
@@ -147,6 +176,26 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         opt.resume, opt.noval, opt.nosave, opt.workers, opt.freeze
     
     experimental_run = True
+    
+    if not os.path.exists(exp_path):
+        os.makedirs(os.path.join(exp_path))
+
+    if not os.path.exists(os.path.join(exp_path, 'original')):
+        os.makedirs(os.path.join(exp_path, 'original'))
+
+    if not os.path.exists(os.path.join(exp_path, 'mod')):
+        os.makedirs(os.path.join(exp_path, 'mod'))
+
+    if not os.path.exists(os.path.join(exp_path, 'random')):
+        os.makedirs(os.path.join(exp_path, 'random'))
+
+    exp_img_path = os.path.join(os.getcwd(), exp_path, 'original', 'image')
+    if not os.path.exists(exp_img_path):
+        os.makedirs(exp_img_path)
+
+    exp_lbl_path = os.path.join(os.getcwd(), exp_path, 'original', 'label')
+    if not os.path.exists(exp_lbl_path):
+        os.makedirs(exp_lbl_path)
 
     callbacks.run('on_pretrain_routine_start')
 
@@ -398,23 +447,29 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 pred = model(imgs)  # forward
                 loss, loss_items = compute_loss(pred, targets.to(device))  # loss scaled by batch_size
 
-                if experimental_run:
+                if experimental_run and not epoch_dict.get(epoch, False):
+                    epoch_dict[epoch] = True
+                    
                     grad = torch.autograd.grad(loss, [imgs], retain_graph=True, allow_unused=True)[0]
 
                     image_list = [to_pil_image(img) for img in imgs]
 
+                    for i, img in enumerate(image_list):
+                        path = f"image_{epoch}_{i}.png"  
+                        path = os.path.join(exp_img_path, path)
+                        img.save(path)
+
+                        path = f"image_{epoch}_{i}.txt"  
+                        path = os.path.join(exp_lbl_path, path)
+                        with open(path, "w") as file:
+                            image_targets = targets[targets[:,0] == i]  
+                            for target in image_targets:
+                                class_id, x, y, w, h = target[1:]  
+                                file.write(f"{int(class_id)} {x} {y} {w} {h}\n")
+
                     detections = detect_mod.run_detection(detection_model, image_list, mode='images', **detection_config)
-                    pprint(detections)
-                    mod_image_list = process_images(grad, image_list, detections)
-
-                    image_tensor_list = [ToTensor()(img) for img in mod_image_list]
-
-                    mod_imgs = torch.stack(image_tensor_list)
-
-                    mod_imgs = mod_imgs.to(device, non_blocking=True)
-
-                    pred = model(mod_imgs)  # forward
-                    loss, loss_items = compute_loss(pred, targets.to(device))
+                    
+                    process_images(grad, image_list, detections, epoch)
 
                 if RANK != -1:
                     loss *= WORLD_SIZE  # gradient averaged between devices in DDP mode

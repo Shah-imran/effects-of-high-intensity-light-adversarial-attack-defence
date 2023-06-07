@@ -52,6 +52,7 @@ from utils.torch_utils import select_device, smart_inference_mode
 import cv2
 import numpy as np
 import random
+import time
 
 def plot_one_box(x, img, color=None, label=None, line_thickness=None):
     # Plots one bounding box on image img
@@ -103,7 +104,7 @@ def run_detection(
     visualize=False,  # Display the detection results
     **_
 ):
-    visualize = False
+    visualize = True
     dataset = LoadImagesPIL(img_list, img_size=imgsz, stride=model.stride, auto=model.pt)
 
     detections_dict = {}
@@ -141,13 +142,13 @@ def run_detection(
                     #     plot_one_box(xyxy, im0s, label=label, color=colors(int(cls), True), line_thickness=line_thickness)
 
         # Add detections to dictionary
-        detections_dict[img_id] = detections
+        detections_dict[str(int(img_id) - 1)] = detections
 
         # Show the image
-        # if visualize:
-        #     cv2.imshow(str(img_id), im0s)
-        #     cv2.waitKey(0)  # Display the image for 1 ms
-
+    #     if visualize:
+    #         cv2.imshow(str(img_id), im0s)
+    #         cv2.waitKey(3000)  # Display the image for 1 ms
+    # time.sleep(10)
     # cv2.destroyAllWindows()
 
     return detections_dict
@@ -161,7 +162,7 @@ def parse_opt():
     parser.add_argument('--source', type=str, default=ROOT / 'test_case/', help='file/dir/URL/glob/screen/0(webcam)')
     parser.add_argument('--data', type=str, default=ROOT / 'data/custom.yaml', help='(optional) dataset.yaml path')
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640], help='inference size h,w')
-    parser.add_argument('--conf-thres', type=float, default=0.45, help='confidence threshold')
+    parser.add_argument('--conf-thres', type=float, default=0.7, help='confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
     parser.add_argument('--max-det', type=int, default=1000, help='maximum detections per image')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
