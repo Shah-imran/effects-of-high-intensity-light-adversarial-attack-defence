@@ -160,10 +160,10 @@ def process_single_image(img_grad, img, img_detections, index, epoch, kernel_siz
             except:
                 pass
 
-            path = os.path.join(mod_path, f"mod_{epoch}_{index}.png")
+            path = os.path.join(mod_path, f"image_{epoch}_{index}.png")
             copy_img_cal.save(path)
 
-            path = os.path.join(random_path, f"random_{epoch}_{index}.png")
+            path = os.path.join(random_path, f"image_{epoch}_{index}.png")
             copy_img_random.save(path)
 
         
