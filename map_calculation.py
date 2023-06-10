@@ -1,5 +1,6 @@
 import os
 from PIL import Image
+from datetime import datetime
 import torch
 import detect_mod
 from pprint import pprint
@@ -7,6 +8,26 @@ import pandas as pd
 import torch
 import numpy as np
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
+import matplotlib.pyplot as plt
+
+
+def save_plots(df):
+    fig, axs = plt.subplots(3, 1, figsize=(10, 15))
+
+    pairs = [('map_mod', 'map_random'), 
+             ('map_50_mod', 'map_50_random'), 
+             ('map_75_mod', 'map_75_random')]
+
+    for idx, pair in enumerate(pairs):
+        axs[idx].plot(df['ratio'], df[pair[0]], label=pair[0], color='b')
+        axs[idx].plot(df['ratio'], df[pair[1]], label=pair[1], color='r')
+        axs[idx].set_title(f'{pair[0]} vs {pair[1]}')
+        axs[idx].set_xlabel('Ratio')
+        axs[idx].set_ylabel('Value')
+        axs[idx].legend(loc='upper left')
+
+    plt.tight_layout()
+    plt.savefig(f'{str(datetime.now())}_plots.png')
 
 
 def save_maps(data_dict):
@@ -41,10 +62,10 @@ def save_maps(data_dict):
     merged_df = pd.merge(mod_df, random_df, on='ratio', suffixes=('_mod', '_random'), how='outer')
     merged_df = merged_df.sort_values('ratio')
     # Save the DataFrame to an Excel file
-    merged_df.to_excel('output.xlsx', index=False)
+    merged_df.to_excel(f'{str(datetime.now())}.xlsx', index=False)
 
     # Show the merged DataFrame
-    print(merged_df)
+    return merged_df
 
 
 def load_data(image_dir, label_dir):
@@ -155,7 +176,9 @@ if __name__=="__main__":
         maps.get(image_path, {})
         maps[image_path] = calculate_map(image_path)
 
-    save_maps(maps)
+    merged_df = save_maps(maps)
+
+    save_plots(merged_df)
 
     # keys = sorted([ item for item in maps.keys()])
 

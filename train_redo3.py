@@ -25,6 +25,7 @@ import time
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
+from pprint import pprint
 
 import numpy
 import numpy as np
@@ -263,6 +264,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 f'Using {train_loader.num_workers * WORLD_SIZE} dataloader workers\n'
                 f"Logging results to {colorstr('bold', save_dir)}\n"
                 f'Starting training for {epochs} epochs...')
+    
+    epoch_dict = {}
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
         e_dir = cust / f'epoch{epoch}'
         (e_dir.parent if evolve else e_dir).mkdir(parents=True, exist_ok=True)
@@ -317,21 +320,23 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
             # Forward
             with torch.cuda.amp.autocast(amp):
-                pred = model(imgs)  # forward
+                model.model[-1].return_inf = True
+                pred, det_pred = model(imgs)  # forward
+                model.model[-1].return_inf = False
+                print(len(det_pred), det_pred[0].shape)
+
                 if epoch == 100:
                     sys.exit()
 
-                save_txt = True
-                save_conf = False
                 conf_thres = 0.4
                 iou_thres = 0.6
                 classes = [0, 1, 2, 3, 4, 5, 6]
                 agnostic_nms = False
                 max_det = 300
-                use_pred = non_max_suppression(pred, conf_thres=conf_thres, iou_thres=iou_thres, classes=classes, agnostic=agnostic_nms, max_det=max_det)
+                use_pred = non_max_suppression(det_pred, conf_thres=conf_thres, iou_thres=iou_thres, classes=classes, agnostic=agnostic_nms, max_det=max_det)
                 
-                if epoch != 0 and epoch % 1 == 0:
-                
+                if not epoch_dict.get(epoch, False):
+                    epoch_dict[epoch] = True
                     for i , pi in enumerate(use_pred):
                         if pi is not None and len(pi):
                             s_name = (paths[i].split("images")[-1][1:]).split('.jp')[0]
@@ -353,11 +358,10 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                 xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                                 line = (cls, *xywh)  # label format
                                 scaled_bboxes.append(('%g ' * len(line)).rstrip() % line + '\n')
-                                x_min, y_min, x_max, y_max = xyxy
-                                x_min, y_min, x_max, y_max = int(x_min * s_img_shape[1]), int(y_min * s_img_shape[0]), \
-                                                int(x_max * s_img_shape[1]), int(y_max * s_img_shape[0])
-                                # print((x_min, y_min), (x_max, y_max))
-                                cv2.rectangle(s_img, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
+
+                                x1, y1, x2, y2 = [int(xyxy[0].item()), int(xyxy[1].item()), int(xyxy[2].item()), int(xyxy[3].item())]
+                                # print(x1, y1, x2, y2)
+                                cv2.rectangle(s_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
                             s_img = s_img.get()
                             cv2.imwrite(output_path, s_img)
@@ -365,6 +369,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                 txt_file.write("".join(scaled_bboxes))
 
                 loss, loss_items = compute_loss(pred, targets.to(device))  # loss scaled by batch_size
+
                 if RANK != -1:
                     loss *= WORLD_SIZE  # gradient averaged between devices in DDP mode
                 if opt.quad:
@@ -521,7 +526,7 @@ def parse_opt(known=False):
     parser.add_argument('--cos-lr', action='store_true', help='cosine LR scheduler')
     parser.add_argument('--label-smoothing', type=float, default=0.0, help='Label smoothing epsilon')
     parser.add_argument('--patience', type=int, default=25, help='EarlyStopping patience (epochs without improvement)')
-    parser.add_argument('--freeze', nargs='+', type=int, default=[24], help='Freeze layers: backbone=10, first3=0 1 2')
+    parser.add_argument('--freeze', nargs='+', type=int, default=[0], help='Freeze layers: backbone=10, first3=0 1 2')
     parser.add_argument('--save-period', type=int, default=-1, help='Save checkpoint every x epochs (disabled if < 1)')
     parser.add_argument('--seed', type=int, default=0, help='Global training seed')
     parser.add_argument('--local_rank', type=int, default=-1, help='Automatic DDP Multi-GPU argument, do not modify')

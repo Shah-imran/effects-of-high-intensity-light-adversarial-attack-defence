@@ -54,6 +54,14 @@ import numpy as np
 import random
 import time
 
+def shape(lst):
+    length = len(lst)
+    shp = tuple(shape(sub) if isinstance(sub, list) else 0 for sub in lst)
+    if any(x != 0 for x in shp):
+        return length, shp
+    else:
+        return length
+
 def plot_one_box(x, img, color=None, label=None, line_thickness=None):
     # Plots one bounding box on image img
     tl = line_thickness or round(0.002 * (img.shape[0] + img.shape[1]) / 2) + 1  # line/font thickness
@@ -105,6 +113,7 @@ def run_detection(
     **_
 ):
     visualize = True
+
     dataset = LoadImagesPIL(img_list, img_size=imgsz, stride=model.stride, auto=model.pt)
 
     detections_dict = {}
@@ -118,6 +127,7 @@ def run_detection(
 
         # Inference
         pred = model(im, augment=augment)
+        print('len pred ', shape(pred), pred[0].shape, pred[0].shape)
 
         # NMS
         pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
@@ -162,7 +172,7 @@ def parse_opt():
     parser.add_argument('--source', type=str, default=ROOT / 'test_case/', help='file/dir/URL/glob/screen/0(webcam)')
     parser.add_argument('--data', type=str, default=ROOT / 'data/custom.yaml', help='(optional) dataset.yaml path')
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640], help='inference size h,w')
-    parser.add_argument('--conf-thres', type=float, default=0.5, help='confidence threshold')
+    parser.add_argument('--conf-thres', type=float, default=0.3, help='confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
     parser.add_argument('--max-det', type=int, default=1000, help='maximum detections per image')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
