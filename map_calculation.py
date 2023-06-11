@@ -1,5 +1,6 @@
 import os
 from PIL import Image
+from PIL import ImageFile
 from datetime import datetime
 import torch
 import detect_mod
@@ -9,6 +10,8 @@ import torch
 import numpy as np
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 import matplotlib.pyplot as plt
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 def save_plots(df):

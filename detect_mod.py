@@ -127,7 +127,6 @@ def run_detection(
 
         # Inference
         pred = model(im, augment=augment)
-        print('len pred ', shape(pred), pred[0].shape, pred[0].shape)
 
         # NMS
         pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)

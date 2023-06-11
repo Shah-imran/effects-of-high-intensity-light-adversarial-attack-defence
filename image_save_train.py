@@ -183,7 +183,7 @@ def process_single_image_noise(img_grad, img, img_detections, index, epoch, kern
 
 def process_single_image_kernel(img_grad, img, img_detections, index, epoch, noise_size_ratio=1):
     start_ratio = 0.2
-    end_ratio = 0.5
+    end_ratio = 0.55
     step = 0.02
 
     img_grad = np.maximum(0, img_grad)
@@ -485,13 +485,13 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 f"Logging results to {colorstr('bold', save_dir)}\n"
                 f'Starting training for {epochs} epochs...')
     
-    detection_config = vars(detect_mod.parse_opt())
+    # detection_config = vars(detect_mod.parse_opt())
 
-    detection_model = detect_mod.warmup_model(weights=detection_config['weights'],
-                                              data=detection_config['data'])
+    # detection_model = detect_mod.warmup_model(weights=detection_config['weights'],
+    #                                           data=detection_config['data'])
     
-    for key in ['weights', 'data', 'imgsz', 'device', 'half', 'dnn', 'source']:
-        detection_config.pop(key)
+    # for key in ['weights', 'data', 'imgsz', 'device', 'half', 'dnn', 'source']:
+    #     detection_config.pop(key)
 
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
         callbacks.run('on_train_epoch_start')
@@ -575,14 +575,14 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
                         detections = []
                         if len(det):
-                            gn = torch.tensor(img.shape)[[1, 0, 1, 0]] 
+                            gn = torch.tensor(img.size)[[1, 0, 1, 0]] 
                             for *xyxy, conf, cls in reversed(det):
                                 x1, y1, x2, y2 = [int(x.item()) for x in xyxy] 
                                 detections.append([int(cls.item()), x1, y1, x2, y2, float(conf.item())])
                     
-                        detections_dict[str(int(i) - 1)] = detections
+                        detections_dict[str(int(i))] = detections
                     # detections = detect_mod.run_detection(detection_model, image_list, mode='images', **detection_config)
-                            
+                    pprint(detections_dict) 
                     process_images(grad, image_list, detections_dict, epoch)
 
                 if RANK != -1:

@@ -263,3 +263,4 @@ fabric.properties
 yolo5/
 .vscode/
 dataset/
+dataset**/

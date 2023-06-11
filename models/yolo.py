@@ -10,6 +10,7 @@ import argparse
 import contextlib
 import os
 import platform
+import traceback
 import sys
 from copy import deepcopy
 from pathlib import Path
@@ -77,8 +78,12 @@ class Detect(nn.Module):
                     y = torch.cat((xy, wh, conf), 4)
                 z.append(y.view(bs, self.na * nx * ny, self.no))
 
-        if self.return_inf:
-            x = (x, (torch.cat(z, 1), x))
+        try:
+            if self.return_inf:
+                x = (x, (torch.cat(z, 1), x))
+        except:
+            # print(f"Error at self.return_inf Detect class {traceback.format_exc()}")
+            pass
         
         return x if self.training else (torch.cat(z, 1),) if self.export else (torch.cat(z, 1), x)
 
