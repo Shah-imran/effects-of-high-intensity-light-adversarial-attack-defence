@@ -553,7 +553,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
                     det_pred = non_max_suppression(det_pred, conf_thres=0.4, iou_thres=0.45, 
                                     classes=[item for item in range(0, len(model.names))], 
-                                    agnostic=False, max_det=300)
+                                    agnostic=False, max_det=50)
                     
                     grad = torch.autograd.grad(loss, [imgs], retain_graph=True, allow_unused=True)[0]
 
