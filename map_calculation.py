@@ -17,25 +17,33 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 def save_plots(df):
     fig, axs = plt.subplots(3, 1, figsize=(10, 15))
 
-    pairs = [('map_mod', 'map_random'), 
-             ('map_50_mod', 'map_50_random'), 
-             ('map_75_mod', 'map_75_random')]
+    pairs = [('map_mod', 'map_random', 'map_original', 'map_adv'), 
+             ('map_50_mod', 'map_50_random', 'map_50_original', 'map_50_adv'), 
+             ('map_75_mod', 'map_75_random', 'map_75_original', 'map_75_adv')]
 
     for idx, pair in enumerate(pairs):
         axs[idx].plot(df['ratio'], df[pair[0]], label=pair[0], color='b')
         axs[idx].plot(df['ratio'], df[pair[1]], label=pair[1], color='r')
+
+        # Plot the 'original' and 'adv' values as horizontal lines
+        axs[idx].axhline(y=df[pair[2]].values[0], color='g', linestyle='-', label=pair[2])
+        axs[idx].axhline(y=df[pair[3]].values[0], color='y', linestyle='-', label=pair[3])
+
         axs[idx].set_title(f'{pair[0]} vs {pair[1]}')
         axs[idx].set_xlabel('Ratio')
-        axs[idx].set_ylabel('Value')
+        axs[idx].set_ylabel('MAP')
         axs[idx].legend(loc='upper left')
 
     plt.tight_layout()
     plt.savefig(f'{str(datetime.now())}_plots.png')
 
 
+
 def save_maps(data_dict):
     mod_data = []
     random_data = []
+    original_data = []
+    adv_data = []
 
     for path, values in data_dict.items():
         # Convert the tensors to standard python data types
@@ -46,9 +54,9 @@ def save_maps(data_dict):
         # Construct a dictionary for the row
         row = {'map': map_val, 'map_50': map_50_val, 'map_75': map_75_val}
 
-        if 'mod' in path or 'original' in path:
-            # Extract the ratio from the path, or use NaN if it's the 'original' path
-            ratio = float(path.split('/')[-2]) if 'mod' in path else np.nan
+        if 'mod' in path:
+            # Extract the ratio from the path
+            ratio = float(path.split('/')[-2])
             row['ratio'] = ratio
             mod_data.append(row)
         elif 'random' in path:
@@ -56,19 +64,33 @@ def save_maps(data_dict):
             ratio = float(path.split('/')[-2])
             row['ratio'] = ratio
             random_data.append(row)
+        elif 'original' in path:
+            original_data.append(row)
+        elif 'adv' in path:
+            adv_data.append(row)
 
     # Create the DataFrames
     mod_df = pd.DataFrame(mod_data)
     random_df = pd.DataFrame(random_data)
+    original_df = pd.DataFrame(original_data)
+    adv_df = pd.DataFrame(adv_data)
 
-    # Merge the two DataFrames on 'ratio'
+    # Merge the DataFrames on 'ratio'
     merged_df = pd.merge(mod_df, random_df, on='ratio', suffixes=('_mod', '_random'), how='outer')
+
+    # Add the 'original' and 'adv' data
+    for col in original_df.columns:
+        merged_df[f'{col}_original'] = original_df[col].iloc[0] if not original_df.empty else np.nan
+    for col in adv_df.columns:
+        merged_df[f'{col}_adv'] = adv_df[col].iloc[0] if not adv_df.empty else np.nan
+
     merged_df = merged_df.sort_values('ratio')
     # Save the DataFrame to an Excel file
     merged_df.to_excel(f'{str(datetime.now())}.xlsx', index=False)
 
     # Show the merged DataFrame
     return merged_df
+
 
 
 def load_data(image_dir, label_dir):
@@ -178,6 +200,10 @@ if __name__=="__main__":
 
         maps.get(image_path, {})
         maps[image_path] = calculate_map(image_path)
+
+    image_path = f"./runs/experiment/adv/"
+    maps.get(image_path, {})
+    maps[image_path] = calculate_map(image_path)
 
     merged_df = save_maps(maps)
 
