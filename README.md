@@ -34,7 +34,9 @@ This project is licensed under the terms of the MIT license.
 
 ## Contact
 
-Feel free to reach out if you have any questions, ideas, or need help with the project.
+Feel free to reach out if you have any questions, or ideas, or need help with the project.
+
+This repo was build upon the code from this [repo](https://github.com/ultralytics/yolov5)
 
 * GitHub: [@shah-imran](https://github.com/Shah-imran)
 * Email: mdshahimranshovon@gmail.com
