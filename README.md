@@ -1,4 +1,4 @@
-# Effects of High-Intensity Light, Adversarial Attack with Light and Its Defence
+# Analyzing the Consequences of High-Intensity Light and Strategies for Defending Against Adversarial Attacks
 
 ## Description
 
