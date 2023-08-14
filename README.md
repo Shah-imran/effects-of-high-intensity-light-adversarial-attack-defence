@@ -18,7 +18,7 @@ This repository documents a research project that investigates the effects of hi
 
 6. **Adversarial Attack Test**: To validate our light noise introduction, we applied a conventional adversarial attack on the model. 
 
-7. **Journal Writing**: We are in the process of documenting our research findings in a journal article, where I am listed as the first author. 
+7. **Journal Writing**: We are in the process of documenting our research findings in a journal article. 
 
 ## Findings
 
